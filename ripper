@@ -59,7 +59,6 @@ wait_new_cd() {
 }
 
 load_cd() {
-    echo "Loading new cd"
     local tmp_dir=$(mktemp -d)
     cd "$tmp_dir"
     cdparanoia -B
