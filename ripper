@@ -18,6 +18,8 @@ Options:
 
 Old Audio books are often spread across multiple cds
 this utility streamlines combining them together
+Notes:
+  - it uses `sha256sum` to detect if cd has been changed
 
 EOF
 }
@@ -40,35 +42,40 @@ done
 shift $((OPTIND-1))
 
 LAST_TRACK_NO=0
+LAST_CD_HASH=""
 
-# Returns true if we should continue reading
-get_input() {
+is_new_cd_loaded() {
+    cdparanoia -Q &> /dev/null || return 1
+    local HASH=$(cdparanoia -Q |& sha256sum)
+    export LAST_CD_HASH="$HASH"
+}
+
+wait_new_cd() {
     while true; do
-        read -p "Another cd loaded, use n to exit [Y/n] " status
-        case "$status" in
-            ""|"Y"|"y") return 0 ;;
-            "n"|"N") return 1 ;;
-            *) echo "Incorrect option '$status'" ;;
-        esac
+        is_new_cd_loaded && return 0
+        echo "Waiting for new cd to be loaded. Or use Ctrl-C to exit"
+        sleep 30;
     done
 }
 
 load_cd() {
-    tmp_dir=$(mktemp -d)
+    echo "Loading new cd"
+    local tmp_dir=$(mktemp -d)
     cd "$tmp_dir"
     cdparanoia -B
     echo $tmp_dir
 }
 
 format_track_name() {
-    track_no=$1
-    track_no_formated=$(printf "%0${DIGITS}d" $track_no)
+    local track_no=$1
+    local track_no_formated=$(printf "%0${DIGITS}d" $track_no)
     echo "track${track_no_formated}.mp3"
 }
 
 convert() {
-    tmp_dir=$1
-    for file in "$tmp_dir"/*.wav; do
+    echo "Converting tracs to mp3"
+    local tmp_dir=$1
+    for file in $tmp_dir/*.wav; do
         export LAST_TRACK_NO=$((LAST_TRACK_NO + 1))
         track_name=$(format_track_name $LAST_TRACK_NO)
         ffmpeg -i "$file" -codec:a libmp3lame -qscale:a 2 "$track_name"
@@ -76,7 +83,8 @@ convert() {
     rm -rf -- "$tmp_dir"
 }
 
-while get_input; do
+while true; do
+    wait_new_cd
     tmp_dir=$(load_cd)
     convert "$tmp_dir"
 done
