@@ -1,0 +1,82 @@
+#!/usr/bin/env sh
+
+set -eu
+# set -o pipefail
+
+usage() {
+        cat <<'EOF'
+Usage: ripper [-v]
+       ripper -h
+
+Extract tracs from cds, convert them to .mp3 (and enumerate them)
+
+Options:
+  -h, --help      Print this message and exit
+  -v, --verbose   Be verbose
+  -d, --digits    Set the expected number of digits (default=2)
+
+
+Old Audio books are often spread across multiple cds
+this utility streamlines combining them together
+
+EOF
+}
+
+
+PARSED_OPTIONS=$(getopt -o hvd --long help,verbose,digits -- "$@")
+eval set -- "$PARSED_OPTIONS"
+
+DIGITS=2
+while true; do
+        case "$1" in
+        -h|--help) usage; exit 0;;
+        -v|--verbose) set -x; shift;;
+        -d|--digits) DIGITS=$2; shift 2;;
+        --) shift; break;;
+        *) echo "Unknown option $1" >&2; usage >&2; exit 1;;
+        esac
+done
+
+shift $((OPTIND-1))
+
+LAST_TRACK_NO=0
+
+# Returns true if we should continue reading
+get_input() {
+    while true; do
+        read -p "Another cd loaded, use n to exit [Y/n] " status
+        case "$status" in
+            ""|"Y"|"y") return 0 ;;
+            "n"|"N") return 1 ;;
+            *) echo "Incorrect option '$status'" ;;
+        esac
+    done
+}
+
+load_cd() {
+    tmp_dir=$(mktemp -d)
+    cd "$tmp_dir"
+    cdparanoia -B
+    echo $tmp_dir
+}
+
+format_track_name() {
+    track_no=$1
+    track_no_formated=$(printf "%0${DIGITS}d" $track_no)
+    echo "track${track_no_formated}.mp3"
+}
+
+convert() {
+    tmp_dir=$1
+    for file in "$tmp_dir"/*.wav; do
+        export LAST_TRACK_NO=$((LAST_TRACK_NO + 1))
+        track_name=$(format_track_name $LAST_TRACK_NO)
+        ffmpeg -i "$file" -codec:a libmp3lame -qscale:a 2 "$track_name"
+    done
+    rm -rf -- "$tmp_dir"
+}
+
+while get_input; do
+    tmp_dir=$(load_cd)
+    convert "$tmp_dir"
+done
