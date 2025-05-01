@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# using bash for associative array
+
+set -eu
+# set -o pipefail
+
+usage() {
+        cat <<EOF
+Usage: duplicates directory_to_search
+       duplicates -h
+
+Searches a directory to find duplicate files
+Uses sha256sum for checking if files are the same
+
+Options:
+  -h, --help      Print this message and exit
+  -v, --verbose   Be verbose
+EOF
+}
+
+# Use `getopt` to parse long and short options
+# use : for additional argument f: signalizer that the next argument is option for f
+# use multiple : for multiple arguments
+# PARSED_OPTIONS=$(getopt -o hvf: --long help,verbose,force: -- "$@")
+PARSED_OPTIONS=$(getopt -o hv --long help,verbose -- "$@")
+
+# Reorder the arguments based on the parsing result
+eval set -- "$PARSED_OPTIONS"
+
+while true; do
+        case "$1" in
+        -h|--help) usage; exit 0;;
+        -v|--verbose) set -x; shift;;
+        --) shift; break;;
+        *) echo "Unknown option $1" 2>&1; usage 2>&1; exit 1;;
+        esac
+done
+
+shift $((OPTIND-1))
+
+# Check if a directory argument is passed
+if [ -z "$1" ]; then
+    echo "Usage: $0 <directory_to_search>"
+    exit 1
+fi
+
+# Directory to search (passed as an argument)
+directory_to_search="${1%/}/"
+
+# Declare an associative array (hashtable)
+declare -A hash_to_name=()
+
+# Iterate through all files in the directory
+IFS=$'\n' # Change IFS to handle lines
+for file_path in $(find "$directory_to_search" -type f); do
+
+    # used when --verbose is set
+    echo "Processing $file_path" &> /dev/null
+
+    hash=$(sha256sum "$file_path" | awk '{ print $1 }')
+
+    # Check if the hash already exists in the hashtable
+    if [[ -v hash_to_name[$hash] ]]; then
+        # If a match is found, print the matching files
+        echo "$file_path ${hash_to_name[$hash]}"
+    else
+        # Otherwise, store the hash and the filename
+        hash_to_name["$hash"]="$file_path"
+    fi
+done

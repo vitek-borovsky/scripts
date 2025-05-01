@@ -1,0 +1,75 @@
+#!/usr/bin/env sh
+
+set -eu
+set -o pipefail
+
+usage() {
+        cat <<'EOF'
+Usage: tarzan [--] Archive_name(.tar.zst) file/dir1 [ file/dir2 [ file/dir3 ... ] ]
+       tarzan -x Archive_name(.tar.zst)
+       tarzan --help
+
+`tar` + Compression using `zst`.
+
+Options:
+  -h, --help      Print this message and exit
+  -v, --verbose   Be verbose
+  -x, --extract   Exctract archive
+  -T, --threads   How many threads to use when compression
+                  Use 0 for maximum, default is 1
+
+Simular to `bzip2` compression ratio while surpassing `gz` speed (5 times)
+Optimized for speed and versetility. For maximum compression look
+- `tar --lzma`
+- `tar -J` (xz)
+`tarzan` also offers progress bar via `pv`
+EOF
+}
+
+PARSED_OPTIONS=$(getopt -o hvT:x --long help,verbose,threads:,extract -- "$@")
+eval set -- "$PARSED_OPTIONS"
+
+compressing=1
+thread_count=1
+while true; do
+        case "$1" in
+        -h|--help) usage; exit 0;;
+        -v|--verbose) set -x; shift;;
+        -T|--threads) thread=$2; shift 2;;
+        -x|--extract) compressing=0; shift;;
+        --) shift; break;;
+        *) echo "Unknown option $1" >&2; usage >&2; exit 1;;
+        esac
+done
+shift $((OPTIND-1))
+
+compress() {
+    archive_name=$1; shift
+    thread_count=$1; shift
+
+    tar -c $@ \
+        | zstd --compress --stdout -T$thread_count \
+        | pv \
+        > $archive_name
+}
+
+extract() {
+    archive_name=$1; shift
+    thread_count=$1; shift
+
+    cat $archive_name \
+        | pv \
+        | zstd --decompress --stdout -T$thread_count \
+        | tar -x
+}
+
+archive_name=$1; shift
+
+if [[ $compressing -eq 1 ]]; then
+    compress $archive_name $thread_count $@
+    exit 0
+fi
+
+# TODO ensure no more arguments
+extract $archive_name $thread_count
+exit 0

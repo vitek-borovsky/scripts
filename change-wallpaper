@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+
+set -eu
+
+new_wallpaper_path=""
+if [ -f $(realpath $1) ]; then
+    new_wallpaper_path=$(realpath $1)
+elif [ -f $(realpath "pictures/wallpapers/$1") ]; then
+    new_wallpaper_path=$(realpath "pictures/wallpapers/$1")
+else
+    echo "No such file found" > /dev/stderr
+fi
+
+kill $(pgrep waybar)
+kill $(pgrep hyprpaper)
+
+wal -i $new_wallpaper_path
+
+echo -e \
+    "preload = $new_wallpaper_path\nwallpaper = eDP-1, $new_wallpaper_path\nwallpaper = HDMI-A-1, $new_wallpaper_path" > \
+    "/home/vitek/.config/hypr/hyprpaper.conf"
+
+echo -e \
+    "#!/usr/bin/env bash\n\nwal -i $new_wallpaper_path > /dev/null" > \
+    "/home/vitek/scripts/.source/wal.sh"
+
+nohup waybar &
+nohup hyprpaper &

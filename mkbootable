@@ -1,0 +1,73 @@
+#!/usr/bin/env sh
+cd $(dirname $0)
+
+set -eu
+# set -o pipefail
+
+usage() {
+        cat <<EOF
+Usage: mkbootable INPUT_FILE OUTPUT_FILE
+
+Create a bootable drive using GNU's disk dump (dd)
+
+Options:
+  -h, --help      Print this message and exit
+EOF
+}
+
+# Use `getopt` to parse long and short options
+# use : for additional argument f: signalizer that the next argument is option for f
+# use multiple : for multiple arguments
+# PARSED_OPTIONS=$(getopt -o hvf: --long help,verbose,force: -- "$@")
+PARSED_OPTIONS=$(getopt -o h --long help -- "$@")
+
+# Reorder the arguments based on the parsing result
+eval set -- "$PARSED_OPTIONS"
+
+force=false
+while true; do
+        case "$1" in
+        -h|--help) usage; exit 0;;
+        --) shift; break;;
+        *) echo "Unknown option $1" 2>&1; usage 2>&1; exit 1;;
+        esac
+done
+
+shift $((OPTIND-1))
+
+INTPUT_FILE=$1
+OUTPUT_FILE=$2
+
+if [ $(whoami) != "root" ]; then
+    echo "Script must be run as root" >&2
+    exit 1
+fi
+
+if [ ! -f "$INTPUT_FILE" ]; then
+    echo "Input file does not exist" >&2
+    exit 2
+fi
+
+# TODO
+# if [ ! -z $(lsblk | grep $INTPUT_FILE) ]; then
+#     echo "Device not connected" >&2
+#     exit 3
+# fi
+
+if [ -z $(cat /proc/mounts | grep "$INTPUT_FILE") ]; then
+    echo "Device is mounted" >&2
+    cat /proc/mounts | grep "$INTPUT_FILE" >&2
+    exit 4
+fi
+
+dd if=$INTPUT_FILE | pv | of=$OUTPUT_FILE bs=4M
+sync
+
+
+# if_sum=$(sha256sum .wget-hsts | awk '{print $1; }')
+# of_sum=$(sha256sum .wget-hsts | awk '{print $1; }')
+#
+# if [ $if_sum -ne $of_sum ]; then
+#     echo "SUMS DON'T MATCH. File transfer was faulty. Try again!!!!" >&2
+#     exit 5
+# fi

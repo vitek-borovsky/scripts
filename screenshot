@@ -1,0 +1,56 @@
+#!/usr/bin/env sh
+
+set -eu
+# set -o pipefail
+
+usage() {
+        cat <<EOF
+Usage: screenshot -m MODE
+       screenshot [-h | --help]
+
+It allows taking screenshots of windows, regions and monitors
+which are saved to a folder of your choosing and copied to your clipboard.
+
+Options:
+  -m, --mode    output(monitor), window, region(slurp)
+  -h            Print this message and exit
+  -v            Be verbose
+EOF
+}
+
+PARSED_OPTIONS=$(getopt -o hvm: --long help,verbose,mode: -- "$@")
+
+# Reorder the arguments based on the parsing result
+eval set -- "$PARSED_OPTIONS"
+
+while true; do
+        case "$1" in
+        -h|--help) usage; exit 0;;
+        -v|--verbose) set -x; shift;;
+        -m|--mode)  mode=$2; shift 2;;
+        --) shift; break;;
+        *) echo "Unknown option $1" 2>&1; usage 2>&1; exit 1;;
+        esac
+done
+
+shift $((OPTIND-1))
+
+if [ -z ${mode:-} ]; then
+    echo "No mode set"
+    exit 1
+fi
+
+
+hyprshot --mode $mode --raw | swappy -f -
+
+filename=$(zenity --entry --text="Choose filename")
+if [ -z $filename ]; then
+    exit 0
+fi
+
+filename=$(echo "$filename" | sed 's/\..*//')
+filename=${SCREENSHOT_DIR:-/home/vitek/pictures/screenshots/}${filename}.png
+
+wl-paste > $filename
+notify-send "Saved as $filename"
+

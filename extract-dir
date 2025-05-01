@@ -1,0 +1,47 @@
+#!/usr/bin/env sh
+
+set -eu
+# set -o pipefail
+
+usage() {
+        cat <<'EOF'
+Usage: gitdo [-gv] [--] dirname
+       gitdo -h
+
+Extract dir into local directory
+```bash
+mv <dirname>/* <dirname/.* . && rmdir dirname
+
+
+Options:
+  -h, --help      Print this message and exit
+  -v, --verbose   Be verbose
+EOF
+}
+
+# Use `getopt` to parse long and short options
+# use : for additional argument f: signalizer that the next argument is option for f
+# use multiple : for multiple arguments
+# PARSED_OPTIONS=$(getopt -o hvf: --long help,verbose,force: -- "$@")
+PARSED_OPTIONS=$(getopt -o hvf --long help,verbose,force -- "$@")
+
+# Reorder the arguments based on the parsing result
+eval set -- "$PARSED_OPTIONS"
+
+force=false
+while true; do
+        case "$1" in
+        -h|--help) usage; exit 0;;
+        -v|--verbose) set -x; shift;;
+        -f|--force) force=true; shift;;
+        --) shift; break;;
+        *) echo "Unknown option $1" >&2; usage >&2; exit 1;;
+        esac
+done
+
+shift $((OPTIND-1))
+
+dirname=$1
+
+mv $dirname/* $dirname/.* . &> /dev/null ||:
+rmdir $dirname

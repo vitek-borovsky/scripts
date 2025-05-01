@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+LOCK_WALLPAPER="/home/vitek/pictures/wallpapers/puss_with_logo.jpg"
+
+PATH=$PATH:/run/current-system/sw/bin
+# echo $(which sudo) >> /home/vitek/lock.log
+# echo $(which su) >> /home/vitek/lock.log
+# echo $(which sshd) >> /home/vitek/lock.log
+# echo "" >> /home/vitek/lock.log
+# echo $(which login) >> /home/vitek/lock.log
+# echo "" >> /home/vitek/lock.log
+
+systemctl suspend
+
+swaylock -f --no-unlock-indicator --image $LOCK_WALLPAPER &> /home/vitek/locking.log

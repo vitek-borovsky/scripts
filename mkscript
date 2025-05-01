@@ -1,0 +1,104 @@
+#!/usr/bin/env sh
+set -eu
+
+usage() {
+    cat <<EOF
+Usage: make-script [-fv] [--force -- verbose] [new_script_path1 [new_script_path2 ... ]]
+       make-script -h [--help]
+
+Creates a basic template for a shell script file. Includes
+- shellbang `sh`
+- folder anchor `cd $(dirname $0)
+- set -eu
+- template for parsing arguments with `getopt` (not to be confused with getopts)
+
+When called with no `new_script_path` arguments the output (= new script template) will be
+put into stdout
+
+EOF
+}
+
+script() {
+    # by commenting EOF__ inside $1 and other variables won't be expanded
+    cat <<'EOF__'
+#!/usr/bin/env sh
+cd $(dirname $0)
+
+set -eu
+# set -o pipefail
+
+usage() {
+        cat <<'EOF'
+Usage: gitdo [-gv] [--] COMMAND... [--]
+       gitdo -h
+
+Execute COMMAND on all tracked files in a Git repository.
+The file names will be provided as command line arguments to COMMAND.
+
+Options:
+  -h, --help      Print this message and exit
+  -v, --verbose   Be verbose
+EOF
+}
+
+# Use `getopt` to parse long and short options
+# use : for additional argument f: signalizer that the next argument is option for f
+# use multiple : for multiple arguments
+# PARSED_OPTIONS=$(getopt -o hvf: --long help,verbose,force: -- "$@")
+PARSED_OPTIONS=$(getopt -o hvf --long help,verbose,force -- "$@")
+
+# Reorder the arguments based on the parsing result
+eval set -- "$PARSED_OPTIONS"
+
+force=false
+while true; do
+        case "$1" in
+        -h|--help) usage; exit 0;;
+        -v|--verbose) set -x; shift;;
+        -f|--force) force=true; shift;;
+        --) shift; break;;
+        *) echo "Unknown option $1" >&2; usage >&2; exit 1;;
+        esac
+done
+
+shift $((OPTIND-1))
+EOF__
+}
+
+################# MAIN SCRIPT BODY #################
+# Check if any arguments were provided
+
+# Use `getopt` to parse long and short options
+PARSED_OPTIONS="$(getopt -o hvf --long help,verbose,force -- "$@")"
+
+# Reorder the arguments based on the parsing result
+eval set -- "$PARSED_OPTIONS"
+
+force=false
+while true; do
+        case "$1" in
+        -h|--help) usage; exit 0;;
+        -v|--verbose) set -x; shift;;
+        -f|--force) force=true; shift;;
+        --) shift; break;;
+        *) echo "Unknown option $1" >&2; usage >&2; exit 1;;
+        esac
+done
+
+if [ "$#" -eq 0 ]; then
+    script
+    exit 0
+fi
+
+while [ "$#" -gt 0 ]; do
+    new_script_path=$1
+    shift
+
+    if [ "$force" != true ] && [ -e "$new_script_path" ]; then
+        echo "'$new_script_path' not created file already exists use --force to override"
+        continue
+    fi
+    echo "Writing into $new_script_path" >&2
+    script > $new_script_path
+    chmod u+x $new_script_path
+done
