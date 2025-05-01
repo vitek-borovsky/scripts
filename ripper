@@ -47,6 +47,7 @@ LAST_CD_HASH=""
 is_new_cd_loaded() {
     cdparanoia -Q &> /dev/null || return 1
     local HASH=$(cdparanoia -Q |& sha256sum)
+    [ "$HASH" = "$LAST_CD_HASH" ] && return 1
     export LAST_CD_HASH="$HASH"
 }
 
