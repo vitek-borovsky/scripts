@@ -1,0 +1,81 @@
+#!/usr/bin/env sh
+
+set -eu
+set -o pipefail
+
+usage() {
+        cat <<'EOF'
+Usage: necomm [-v] [root_dir]
+       necomm -h
+
+Not Enough COMMitment looks through directories and finds
+uncommited/ unpushed changes in git repositories
+
+Options:
+    root_dir        Defaults to '.' (meaning PWD)
+    -h, --help      Print this message and exit
+    -v, --verbose   Be verbose
+EOF
+}
+
+# Use `getopt` to parse long and short options
+# use : for additional argument f: signalizer that the next argument is option for f
+# use multiple : for multiple arguments
+# PARSED_OPTIONS=$(getopt -o hvf: --long help,verbose,force: -- "$@")
+PARSED_OPTIONS=$(getopt -o hv --long help,verbose -- "$@")
+
+# Reorder the arguments based on the parsing result
+eval set -- "$PARSED_OPTIONS"
+
+force=false
+while true; do
+        case "$1" in
+        -h|--help) usage; exit 0;;
+        -v|--verbose) set -x; shift;;
+        --) shift; break;;
+        *) echo "Unknown option $1" >&2; usage >&2; exit 1;;
+        esac
+done
+
+shift $((OPTIND-1))
+######################################################################
+
+ROOT_DIR="${1:-${PWD}}"
+
+check-dir() {
+    local dir_path=$1
+    cd $dir_path
+    # Check for uncommitted changes
+    if [[ -n "$(git status --porcelain)" ]]; then
+        echo "[$(realpath .)] Uncommitted changes present"
+    fi
+
+    # Check for unpushed changes
+    UNPUSHED="$(git log --oneline @{u}..HEAD)"
+    if [[ -n "$UNPUSHED" ]]; then
+        echo "[$dir_path] Unpushed commits:"
+        echo "$UNPUSHED" | sed 's/^/     - /'
+    fi
+}
+
+get-git-dirs() {
+    local root_dir="$1"
+    cd "$root_dir"
+    # find all normally cloned git repos
+    find . -type d -name .git -prune -print | sed 's|/.git||'
+
+    # find all --bare git repos
+    bare_repos=$(find . -type d | grep worktrees$ | sed 's|/worktrees||')
+
+    [[ -z "$bare_repos" ]] && return
+    echo "$bare_repos" | while read repo; do
+        ls "$repo/worktrees" | while read branch; do
+            echo "$repo/$branch"
+        done
+    done
+}
+
+get-git-dirs "$ROOT_DIR" | while read gitdir; do
+    cd "$ROOT_DIR"
+    check-dir "$gitdir"
+done
