@@ -62,6 +62,9 @@ while true; do
 done
 
 shift $((OPTIND-1))
+#FIXME remove this
+# Very useful for debuging with `watch` to see latest written version of file
+ls -l "$0"
 EOF__
 }
 
